@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>职级晋级荣誉榜在线生成工具</title>
+  <style>
+    :root {
+      --brand: #18ad91;
+      --brand-blue: #2477a8;
+      --brand-deep: #2c34b6;
+      --text: #172033;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --soft: #f8fafc;
+      --shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(24, 173, 145, 0.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(44, 52, 182, 0.10), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .app {
+      --sidebar-width: 520px;
+      display: grid;
+      grid-template-columns: minmax(380px, var(--sidebar-width)) 10px minmax(520px, 1fr);
+      gap: 10px;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .panel,
+    .preview-panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 40px);
+      border-color: rgba(226, 232, 240, 0.85);
+    }
+
+    .resize-handle {
+      position: relative;
+      align-self: stretch;
+      min-height: calc(100vh - 40px);
+      border-radius: 999px;
+      cursor: col-resize;
+    }
+
+    .resize-handle::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 68px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      transform: translate(-50%, -50%);
+      transition: width 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .resize-handle:hover::before,
+    .resize-handle.is-dragging::before {
+      width: 6px;
+      background: linear-gradient(180deg, var(--brand), var(--brand-blue));
+      box-shadow: 0 0 0 6px rgba(24, 173, 145, 0.12);
+    }
+
+    body.is-resizing {
+      cursor: col-resize;
+      user-select: none;
+    }
+
+    body.is-resizing iframe {
+      pointer-events: none;
+    }
+
+    .panel-header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 16px 20px 14px;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, rgba(24, 173, 145, 0.16), rgba(36, 119, 168, 0.10)),
+        rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 21px;
+      line-height: 1.25;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .panel-body {
+      overflow: auto;
+      padding: 16px 16px 22px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .section {
+      margin: 0 0 16px;
+      padding: 16px;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      margin: 0 0 13px;
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .section-title::before {
+      content: "";
+      width: 8px;
+      height: 18px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--brand), var(--brand-blue));
+      box-shadow: 0 0 0 4px rgba(24, 173, 145, 0.10);
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 6px;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid #d6dee9;
+      border-radius: 12px;
+      padding: 9px 11px;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    select {
+      appearance: none;
+      padding-right: 36px;
+      background-image:
+        linear-gradient(45deg, transparent 50%, #64748b 50%),
+        linear-gradient(135deg, #64748b 50%, transparent 50%);
+      background-position:
+        calc(100% - 18px) 50%,
+        calc(100% - 12px) 50%;
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(24, 173, 145, 0.14);
+    }
+
+    textarea {
+      min-height: 86px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 9px 13px;
+      background: #e8f5f3;
+      color: #0f766e;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--brand), var(--brand-blue), var(--brand-deep));
+      color: #fff;
+    }
+
+    .danger {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .ghost {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .people-toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .upload-box {
+      padding: 12px;
+      border: 1px dashed #b9c7d8;
+      border-radius: 14px;
+      background: var(--soft);
+    }
+
+    .people-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .person-card {
+      border: 1px solid rgba(203, 213, 225, 0.85);
+      border-radius: 16px;
+      padding: 12px;
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+    }
+
+    .person-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eef2f7;
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .person-index {
+      display: inline-grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand), var(--brand-blue));
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .person-brief {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .person-row {
+      display: grid;
+      grid-template-columns: 1.1fr 0.65fr 1fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .person-meta {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .avatar-editor {
+      display: grid;
+      gap: 7px;
+      justify-items: center;
+    }
+
+    .avatar-preview {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border: 2px solid var(--brand);
+      border-radius: 50%;
+      overflow: hidden;
+      background: #e8f5f3;
+      color: var(--brand);
+      font-size: 19px;
+      font-weight: 800;
+      box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.9);
+    }
+
+    .avatar-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .avatar-upload {
+      width: 84px;
+      padding: 7px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .compact-actions {
+      justify-content: flex-end;
+      align-content: end;
+    }
+
+    .compact-actions button {
+      padding: 8px 11px;
+      font-size: 12px;
+    }
+
+    .paragraph-card {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #e8eef5;
+      border-radius: 14px;
+      background: var(--soft);
+    }
+
+    .paragraph-card:first-child {
+      margin-top: 0;
+    }
+
+    .paragraph-card .actions {
+      margin-top: 8px;
+    }
+
+    .export-actions button {
+      flex: 1 1 130px;
+    }
+
+    .avatar-upload input {
+      display: none;
+    }
+
+    .person-card label {
+      margin-top: 0;
+    }
+
+    .small-note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--brand-blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 40px);
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .preview-header strong {
+      font-size: 15px;
+    }
+
+    iframe {
+      width: 100%;
+      flex: 1;
+      border: 0;
+      background: #f0f2f5;
+    }
+
+    @media (max-width: 1100px) {
+      .app {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .panel,
+      .preview-panel {
+        max-height: none;
+        min-height: auto;
+      }
+
+      .resize-handle {
+        display: none;
+      }
+
+      iframe {
+        min-height: 760px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        padding: 12px;
+      }
+
+      .panel-header {
+        padding: 18px;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      .grid-2,
+      .people-toolbar,
+      .person-row,
+      .person-meta {
+        grid-template-columns: 1fr;
+      }
+
+      .avatar-editor {
+        grid-template-columns: auto 1fr;
+        justify-items: start;
+        align-items: center;
+      }
+
+      .compact-actions {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="panel">
+      <div class="panel-header">
+        <h1>职级晋级荣誉榜在线生成工具</h1>
+        <p class="hint">在左侧编辑内容，右侧实时预览邮件。所有处理都在浏览器本地完成，头像会内嵌到导出的 HTML 中。</p>
+      </div>
+
+      <div class="panel-body">
+        <div class="section">
+          <h2 class="section-title">基础信息</h2>
+          <div class="grid-2">
+            <div>
+              <label for="year">年度</label>
+              <input id="year" value="2026">
+            </div>
+            <div>
+              <label for="colsPerRow">每行人数</label>
+              <select id="colsPerRow">
+                <option value="3">3 人</option>
+                <option value="4" selected>4 人</option>
+                <option value="5">5 人</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="title">中文标题</label>
+          <input id="title" value="{year}年度职级晋级荣誉榜">
+
+          <label for="subtitle">英文副标题</label>
+          <input id="subtitle" value="{year} Professional Level Promotion Honor Roll">
+
+          <label for="greeting">开头称呼</label>
+          <input id="greeting" value="Dear All，">
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">正文文案</h2>
+          <p class="small-note">可以使用 <strong>{year}</strong> 和 <strong>{total}</strong> 占位符，生成时会自动替换。</p>
+          <div id="paragraphEditor"></div>
+          <div class="actions">
+            <button type="button" id="addParagraph">添加段落</button>
+          </div>
+
+          <label for="note">名单说明</label>
+          <input id="note" value="注：排名不分先后">
+
+          <label for="slogan">结尾口号</label>
+          <input id="slogan" value="让极光理想照亮每一个人，让每一个人闪耀极光！">
+
+          <label for="footerText">页脚署名</label>
+          <input id="footerText" value="{year} · 人力资源部 Aurora HR Department">
+
+          <label for="footerNote">页脚说明</label>
+          <input id="footerNote" value="本邮件由系统自动发送，请勿直接回复">
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">人员名单</h2>
+          <div class="people-toolbar">
+            <div class="upload-box">
+              <label for="csvInput">导入 CSV</label>
+              <input id="csvInput" type="file" accept=".csv,text/csv">
+            </div>
+            <div class="upload-box">
+              <label for="avatarInput">上传头像</label>
+              <input id="avatarInput" type="file" accept="image/*" multiple>
+            </div>
+          </div>
+          <p class="small-note">CSV 表头需包含：姓名、族、类型、头像文件名。头像文件名与上传图片文件名一致时会自动匹配。</p>
+          <div class="actions">
+            <button type="button" id="addPerson">添加人员</button>
+            <button type="button" id="loadSample" class="ghost">恢复示例数据</button>
+            <button type="button" id="clearPeople" class="danger">清空名单</button>
+          </div>
+          <div id="peopleList" class="people-list"></div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">导出</h2>
+          <div class="actions export-actions">
+            <button type="button" id="copyHtml" class="primary">复制邮件 HTML</button>
+            <button type="button" id="downloadHtml">下载 HTML</button>
+            <button type="button" id="downloadCsv" class="ghost">下载 CSV</button>
+          </div>
+          <p id="status" class="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <div class="resize-handle" id="resizeHandle" role="separator" aria-orientation="vertical" aria-label="调整左侧编辑栏宽度"></div>
+
+    <section class="preview-panel">
+      <div class="preview-header">
+        <strong>实时预览</strong>
+        <span id="summary" class="small-note"></span>
+      </div>
+      <iframe id="preview" title="邮件预览"></iframe>
+    </section>
+  </main>
+
+  <script>
+    const tribeConfig = {
+      T: { label: "T 族", sub: "Technical · 技术序列" },
+      S: { label: "S 族", sub: "Sales · 销售序列" },
+      P: { label: "P 族", sub: "Professional · 职能序列" }
+    };
+
+    const samplePeople = [
+      { name: "张明", tribe: "T", category: "开发类", avatarFile: "zhangming.jpg" },
+      { name: "李薇", tribe: "T", category: "开发类", avatarFile: "liwei.jpg" },
+      { name: "王浩", tribe: "T", category: "开发类", avatarFile: "" },
+      { name: "陈晓", tribe: "T", category: "开发类", avatarFile: "" },
+      { name: "赵阳", tribe: "T", category: "开发类", avatarFile: "" },
+      { name: "孙悦", tribe: "T", category: "测试类", avatarFile: "" },
+      { name: "周磊", tribe: "T", category: "测试类", avatarFile: "" },
+      { name: "林峰", tribe: "S", category: "销售类", avatarFile: "" },
+      { name: "黄丽", tribe: "S", category: "销售类", avatarFile: "" },
+      { name: "何强", tribe: "S", category: "销售类", avatarFile: "" },
+      { name: "郑婷", tribe: "P", category: "财务类", avatarFile: "" },
+      { name: "刘洋", tribe: "P", category: "财务类", avatarFile: "" },
+      { name: "吴芳", tribe: "P", category: "人力资源类", avatarFile: "" }
+    ];
+
+    const defaultParagraphs = [
+      "为满足公司未来快速发展的各类人才需求，完善人才梯队建设，同时为绩效优异、能力突出的人员提供更广阔的发展空间，公司启动了{year}年专业职级晋级评估项目，同时基于组织和人才发展需要，此次晋升设置了对AI应用能力的评审；最终依据评审规则，有 {total} 位小伙伴成功通过职级晋级评审，顺利晋级。",
+      "晋级不仅意味着未来有加薪的机会和更大的激励空间，更重要的是它是对自己成长的确认和反馈，可以更好帮助你做好职业生涯规划；未能晋级的伙伴，也不必感到气馁，首先能参与到职级评审，足以说明你在绩效、行业影响或创新上的优异表现，晋级结果更重要的是对自我成长的反馈，帮助你更清晰自我的发展路径和提升方向，助力你更快速的成长，望再接再厉！",
+      "但最终，成长归根到底是自己的事，历史经验证明：具备清晰目标、能够持续自我驱动、进取心强、善于学习的小伙伴成长速度通常更快！",
+      "\"人才是极光的第一生产力\"，文化2.0的发布，将\"关心员工成长\"列为公司重要的管理理念，员工的成长带来公司竞争力的提升，竞争力的提升为员工的成长创造更多挑战性的机会和更多元的支持环境，望各级管理者在未来的组织建设中，投入更大的精力更多的支持来帮助内部员工成长和发展！期待大家持续进取、自我超越，在更高效高质量地完成本职工作的同时，更快地自我成长！",
+      "再次祝贺成功晋级的小伙伴！"
+    ];
+
+    const state = {
+      paragraphs: [...defaultParagraphs],
+      people: samplePeople.map((person) => ({ ...person })),
+      avatars: new Map()
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function initResizableSidebar() {
+      const app = document.querySelector(".app");
+      const handle = $("resizeHandle");
+      const savedWidth = Number(localStorage.getItem("promotionSidebarWidth"));
+      if (savedWidth) {
+        app.style.setProperty("--sidebar-width", `${clamp(savedWidth, 380, 760)}px`);
+      }
+
+      handle.addEventListener("pointerdown", (event) => {
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+        handle.classList.add("is-dragging");
+        document.body.classList.add("is-resizing");
+      });
+
+      handle.addEventListener("pointermove", (event) => {
+        if (!handle.classList.contains("is-dragging")) return;
+        const rect = app.getBoundingClientRect();
+        const styles = window.getComputedStyle(app);
+        const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+        const paddingRight = parseFloat(styles.paddingRight) || 0;
+        const minPreviewWidth = 520;
+        const maxWidth = rect.width - paddingLeft - paddingRight - minPreviewWidth - 40;
+        const nextWidth = clamp(event.clientX - rect.left - paddingLeft, 380, Math.max(420, maxWidth));
+        app.style.setProperty("--sidebar-width", `${nextWidth}px`);
+        localStorage.setItem("promotionSidebarWidth", String(Math.round(nextWidth)));
+      });
+
+      function stopResize(event) {
+        if (!handle.classList.contains("is-dragging")) return;
+        handle.classList.remove("is-dragging");
+        document.body.classList.remove("is-resizing");
+        if (event.pointerId !== undefined) {
+          handle.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      handle.addEventListener("pointerup", stopResize);
+      handle.addEventListener("pointercancel", stopResize);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function fillTemplate(value) {
+      const year = $("year").value.trim() || "2026";
+      const total = state.people.filter((person) => person.name.trim()).length;
+      return String(value ?? "")
+        .replaceAll("{year}", year)
+        .replaceAll("{total}", String(total));
+    }
+
+    function paragraphHtml(text, index) {
+      const year = $("year").value.trim() || "2026";
+      const total = state.people.filter((person) => person.name.trim()).length;
+      const weight = index === state.paragraphs.length - 1 ? "font-weight:600;" : "";
+      const totalHtml = `<span style="background:linear-gradient(135deg,#18AD91,#2477a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:800;">${total}</span>`;
+      const content = String(text ?? "")
+        .replaceAll("{year}", year)
+        .split("{total}")
+        .map((part) => escapeHtml(part))
+        .join(totalHtml);
+      return weight ? `<span style="${weight}">${content}</span>` : content;
+    }
+
+    function initialAvatar(name) {
+      const initial = escapeHtml((name || "?").trim().charAt(0) || "?");
+      return `<div class="avatar-wrap" style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;border:2.5px solid #18AD91;overflow:hidden;background:#e8f5f3;"><svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56"><rect width="56" height="56" rx="28" fill="#e8f5f3"/><text x="28" y="30" text-anchor="middle" dominant-baseline="central" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" fill="#18AD91">${initial}</text></svg></div>`;
+    }
+
+    function avatarHtml(person) {
+      const src = state.avatars.get(person.avatarFile);
+      if (!src) return initialAvatar(person.name);
+      return `<div class="avatar-wrap" style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;border:2.5px solid #18AD91;overflow:hidden;background:#e8f5f3;"><img src="${src}" width="56" height="56" alt="${escapeHtml(person.name)}" style="width:100%;height:100%;object-fit:cover;display:block;"></div>`;
+    }
+
+    function buildPersonTd(person, width) {
+      const category = `${person.tribe.toUpperCase()}-${person.category}`;
+      return `        <td style="width:${width}%;vertical-align:top;text-align:center;padding:16px 6px 14px;background:#f8fafc;border:1px solid #edf2f7;border-radius:10px;">
+          ${avatarHtml(person)}
+          <p style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 3px;line-height:1.3;">${escapeHtml(person.name)}</p>
+          <p style="font-size:11px;color:#64748b;margin:0;line-height:1.3;">${escapeHtml(category)}</p>
+        </td>`;
+    }
+
+    function buildTribeSection(tribeKey, people) {
+      const cols = Number($("colsPerRow").value || 4);
+      const width = Math.floor(100 / cols);
+      const config = tribeConfig[tribeKey] || { label: `${tribeKey} 族`, sub: "" };
+      const rows = [];
+      for (let index = 0; index < people.length; index += cols) {
+        const chunk = people.slice(index, index + cols);
+        const cells = chunk.map((person) => buildPersonTd(person, width));
+        while (cells.length < cols) {
+          cells.push("        <td style=\"background:transparent;border:none;\"></td>");
+        }
+        rows.push(`      <tr>\n${cells.join("\n")}\n      </tr>`);
+      }
+
+      return `
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:30px 0;">
+    <div style="text-align:center;margin:0 0 6px;">
+      <span style="display:inline-block;background:linear-gradient(135deg,#18AD91 0%,#199c99 33%,#2477a8 66%,#2c34b6 100%);color:#fff;font-size:18px;font-weight:800;padding:4px 28px;border-radius:999px;letter-spacing:2px;">${escapeHtml(config.label)}</span>
+    </div>
+    <p style="text-align:center;font-size:13px;color:#94a3b8;margin:0 0 20px;letter-spacing:.5px;">${escapeHtml(config.sub)}</p>
+    <table width="100%" cellspacing="8" cellpadding="0" role="presentation" style="border-collapse:separate;border-spacing:8px;margin:0 0 6px;">
+${rows.join("\n")}
+    </table>`;
+    }
+
+    function groupPeople() {
+      const grouped = new Map();
+      state.people
+        .filter((person) => person.name.trim() && person.tribe.trim() && person.category.trim())
+        .forEach((person) => {
+          const tribe = person.tribe.trim().toUpperCase();
+          if (!grouped.has(tribe)) grouped.set(tribe, []);
+          grouped.get(tribe).push({ ...person, tribe });
+        });
+      return grouped;
+    }
+
+    function buildEmailHtml() {
+      const grouped = groupPeople();
+      const orderedTribes = [...Object.keys(tribeConfig), ...[...grouped.keys()].filter((key) => !tribeConfig[key])];
+      const tribeHtml = orderedTribes
+        .filter((key) => grouped.has(key))
+        .map((key) => buildTribeSection(key, grouped.get(key)))
+        .join("\n");
+      const title = escapeHtml(fillTemplate($("title").value));
+      const subtitle = escapeHtml(fillTemplate($("subtitle").value));
+      const greeting = escapeHtml(fillTemplate($("greeting").value));
+      const paragraphs = state.paragraphs
+        .filter((text) => text.trim())
+        .map((text, index) => `    <p style="margin:0 0 10px;font-size:14px;color:#4a5568;line-height:1.85;">${paragraphHtml(text, index)}</p>`)
+        .join("\n");
+      const note = escapeHtml(fillTemplate($("note").value));
+      const slogan = escapeHtml(fillTemplate($("slogan").value));
+      const footerText = escapeHtml(fillTemplate($("footerText").value));
+      const footerNote = escapeHtml(fillTemplate($("footerNote").value));
+
+      return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+</head>
+<body style="margin:0;padding:0;width:100%!important;background:#f0f2f5;font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;">
+<div style="width:100%;background:#f0f2f5;padding:40px 0;"><div style="max-width:720px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);">
+
+  <div style="background:linear-gradient(135deg,#18AD91 0%,#199c99 33%,#2477a8 66%,#2c34b6 100%);padding:44px 40px 40px;color:#fff;text-align:center;position:relative;overflow:hidden;">
+    <h1 style="font-size:26px;font-weight:700;letter-spacing:3px;margin:0;line-height:1.4;">${title}</h1>
+    <div style="font-size:14px;opacity:.75;margin-top:8px;letter-spacing:.5px;">${subtitle}</div>
+  </div>
+
+  <div style="padding:36px 40px 20px;font-size:14px;line-height:1.8;color:#4a5568;">
+    <p style="margin:0 0 10px;font-size:14px;color:#4a5568;line-height:1.85;">${greeting}</p>
+${paragraphs}
+    <p style="font-size:12px;color:#64748b;margin:16px 0 0;">${note}</p>
+${tribeHtml}
+
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:30px 0;">
+    <p style="text-align:center;font-size:15px;font-weight:700;margin:24px 0 6px;background:linear-gradient(135deg,#18AD91 0%,#2477a8 50%,#2c34b6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;">${slogan}</p>
+  </div>
+
+  <div style="background:#f7fafc;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="font-size:12px;color:#a0aec0;margin:0;line-height:1.6;">${footerText}</p>
+    <p style="font-size:12px;color:#a0aec0;margin:0;line-height:1.6;">${footerNote}</p>
+  </div>
+
+</div></div>
+</body>
+</html>`;
+    }
+
+    function renderParagraphEditor() {
+      $("paragraphEditor").innerHTML = state.paragraphs.map((text, index) => `
+        <div class="paragraph-card">
+          <label for="paragraph-${index}">段落 ${index + 1}</label>
+          <textarea id="paragraph-${index}" data-paragraph-index="${index}">${escapeHtml(text)}</textarea>
+          <div class="actions">
+            <button type="button" class="ghost" data-move-up="${index}">上移</button>
+            <button type="button" class="ghost" data-move-down="${index}">下移</button>
+            <button type="button" class="danger" data-delete-paragraph="${index}">删除</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function editorAvatarPreview(person) {
+      const src = state.avatars.get(person.avatarFile);
+      if (src) {
+        return `<img src="${src}" alt="${escapeHtml(person.name || "头像")}">`;
+      }
+      return escapeHtml((person.name || "?").trim().charAt(0) || "?");
+    }
+
+    function renderPeopleEditor() {
+      $("peopleList").innerHTML = state.people.map((person, index) => `
+        <div class="person-card">
+          <div class="person-card-header">
+            <span><span class="person-index">${index + 1}</span>${escapeHtml(person.name || "未命名人员")}</span>
+            <span class="person-brief">${escapeHtml((person.tribe || "T").toUpperCase())}-${escapeHtml(person.category || "待填写类型")}</span>
+          </div>
+          <div class="person-row">
+            <div>
+              <label for="name-${index}">姓名</label>
+              <input id="name-${index}" data-field="name" data-person-index="${index}" value="${escapeHtml(person.name)}">
+            </div>
+            <div>
+              <label for="tribe-${index}">族</label>
+              <input id="tribe-${index}" data-field="tribe" data-person-index="${index}" value="${escapeHtml(person.tribe)}">
+            </div>
+            <div>
+              <label for="category-${index}">类型</label>
+              <input id="category-${index}" data-field="category" data-person-index="${index}" value="${escapeHtml(person.category)}">
+            </div>
+          </div>
+          <div class="person-meta">
+            <div class="avatar-editor">
+              <div class="avatar-preview">${editorAvatarPreview(person)}</div>
+              <label class="avatar-upload ghost">
+                上传头像
+                <input type="file" accept="image/*" data-avatar-person="${index}">
+              </label>
+            </div>
+            <div class="actions compact-actions">
+              <button type="button" class="ghost" data-remove-avatar="${index}">移除头像</button>
+              <button type="button" class="danger" data-delete-person="${index}">删除</button>
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function updatePreview(message = "") {
+      const html = buildEmailHtml();
+      $("preview").srcdoc = html;
+      const grouped = groupPeople();
+      const total = [...grouped.values()].reduce((sum, list) => sum + list.length, 0);
+      $("summary").textContent = `共 ${total} 人 · ${[...grouped.entries()].map(([key, list]) => `${key}族 ${list.length}人`).join("、")}`;
+      if (message) {
+        $("status").textContent = message;
+        window.clearTimeout(updatePreview.statusTimer);
+        updatePreview.statusTimer = window.setTimeout(() => {
+          $("status").textContent = "";
+        }, 3000);
+      }
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let quoted = false;
+      for (let i = 0; i < text.length; i += 1) {
+        const char = text[i];
+        const next = text[i + 1];
+        if (char === "\"" && quoted && next === "\"") {
+          cell += "\"";
+          i += 1;
+        } else if (char === "\"") {
+          quoted = !quoted;
+        } else if (char === "," && !quoted) {
+          row.push(cell);
+          cell = "";
+        } else if ((char === "\n" || char === "\r") && !quoted) {
+          if (char === "\r" && next === "\n") i += 1;
+          row.push(cell);
+          if (row.some((value) => value.trim())) rows.push(row);
+          row = [];
+          cell = "";
+        } else {
+          cell += char;
+        }
+      }
+      row.push(cell);
+      if (row.some((value) => value.trim())) rows.push(row);
+      return rows;
+    }
+
+    function importCsv(text) {
+      const rows = parseCsv(text.replace(/^\uFEFF/, ""));
+      if (rows.length < 2) {
+        updatePreview("CSV 没有可导入的数据");
+        return;
+      }
+      const headers = rows[0].map((header) => header.trim());
+      const indexOf = (name) => headers.indexOf(name);
+      const nameIndex = indexOf("姓名");
+      const tribeIndex = indexOf("族");
+      const categoryIndex = indexOf("类型");
+      const avatarIndex = indexOf("头像文件名");
+      if ([nameIndex, tribeIndex, categoryIndex].includes(-1)) {
+        updatePreview("CSV 表头需包含：姓名、族、类型");
+        return;
+      }
+      state.people = rows.slice(1)
+        .map((row) => ({
+          name: (row[nameIndex] || "").trim(),
+          tribe: (row[tribeIndex] || "").trim().toUpperCase(),
+          category: (row[categoryIndex] || "").trim(),
+          avatarFile: avatarIndex >= 0 ? (row[avatarIndex] || "").trim() : ""
+        }))
+        .filter((person) => person.name && person.tribe && person.category);
+      renderPeopleEditor();
+      updatePreview(`已导入 ${state.people.length} 人`);
+    }
+
+    function toCsvValue(value) {
+      const text = String(value ?? "");
+      return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
+    }
+
+    function download(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function normalizeName(value) {
+      return String(value || "")
+        .replace(/\.[^.]+$/, "")
+        .replace(/\s+/g, "")
+        .toLowerCase();
+    }
+
+    function matchUploadedAvatars(uploadedFiles) {
+      const usedFiles = new Set();
+      const matchedPeople = new Set();
+
+      state.people.forEach((person, personIndex) => {
+        if (!person.avatarFile) return;
+        const matched = uploadedFiles.find((file) => file.name === person.avatarFile);
+        if (!matched) return;
+        usedFiles.add(matched.name);
+        matchedPeople.add(personIndex);
+      });
+
+      state.people.forEach((person, personIndex) => {
+        if (matchedPeople.has(personIndex)) return;
+        const personName = normalizeName(person.name);
+        if (!personName) return;
+        const matched = uploadedFiles.find((file) => {
+          if (usedFiles.has(file.name)) return false;
+          const fileName = normalizeName(file.name);
+          return fileName === personName || fileName.includes(personName);
+        });
+        if (!matched) return;
+        person.avatarFile = matched.name;
+        usedFiles.add(matched.name);
+        matchedPeople.add(personIndex);
+      });
+
+      uploadedFiles.forEach((file) => {
+        if (usedFiles.has(file.name)) return;
+        const emptyPersonIndex = state.people.findIndex((person, personIndex) => {
+          if (matchedPeople.has(personIndex)) return false;
+          return !person.avatarFile || !state.avatars.has(person.avatarFile);
+        });
+        if (emptyPersonIndex < 0) return;
+        state.people[emptyPersonIndex].avatarFile = file.name;
+        usedFiles.add(file.name);
+        matchedPeople.add(emptyPersonIndex);
+      });
+
+      return matchedPeople.size;
+    }
+
+    document.addEventListener("input", (event) => {
+      const paragraphIndex = event.target.dataset.paragraphIndex;
+      const personIndex = event.target.dataset.personIndex;
+      const field = event.target.dataset.field;
+      if (paragraphIndex !== undefined) {
+        state.paragraphs[Number(paragraphIndex)] = event.target.value;
+      }
+      if (personIndex !== undefined && field) {
+        state.people[Number(personIndex)][field] = event.target.value;
+      }
+      updatePreview();
+    });
+
+    document.addEventListener("click", async (event) => {
+      const target = event.target;
+      if (target.id === "addParagraph") {
+        state.paragraphs.push("");
+        renderParagraphEditor();
+        updatePreview("已添加段落");
+      }
+      if (target.dataset.deleteParagraph !== undefined) {
+        state.paragraphs.splice(Number(target.dataset.deleteParagraph), 1);
+        renderParagraphEditor();
+        updatePreview("已删除段落");
+      }
+      if (target.dataset.moveUp !== undefined) {
+        const index = Number(target.dataset.moveUp);
+        if (index > 0) {
+          [state.paragraphs[index - 1], state.paragraphs[index]] = [state.paragraphs[index], state.paragraphs[index - 1]];
+          renderParagraphEditor();
+          updatePreview("已上移段落");
+        }
+      }
+      if (target.dataset.moveDown !== undefined) {
+        const index = Number(target.dataset.moveDown);
+        if (index < state.paragraphs.length - 1) {
+          [state.paragraphs[index + 1], state.paragraphs[index]] = [state.paragraphs[index], state.paragraphs[index + 1]];
+          renderParagraphEditor();
+          updatePreview("已下移段落");
+        }
+      }
+      if (target.id === "addPerson") {
+        state.people.push({ name: "", tribe: "T", category: "", avatarFile: "" });
+        renderPeopleEditor();
+        updatePreview("已添加人员");
+      }
+      if (target.dataset.deletePerson !== undefined) {
+        state.people.splice(Number(target.dataset.deletePerson), 1);
+        renderPeopleEditor();
+        updatePreview("已删除人员");
+      }
+      if (target.dataset.removeAvatar !== undefined) {
+        const index = Number(target.dataset.removeAvatar);
+        const avatarFile = state.people[index].avatarFile;
+        if (avatarFile) {
+          state.avatars.delete(avatarFile);
+          state.people[index].avatarFile = "";
+        }
+        renderPeopleEditor();
+        updatePreview("已移除头像");
+      }
+      if (target.id === "loadSample") {
+        state.people = samplePeople.map((person) => ({ ...person }));
+        renderPeopleEditor();
+        updatePreview("已恢复示例数据");
+      }
+      if (target.id === "clearPeople") {
+        state.people = [];
+        renderPeopleEditor();
+        updatePreview("已清空名单");
+      }
+      if (target.id === "downloadHtml") {
+        const year = $("year").value.trim() || "2026";
+        download(`${year}年度职级晋级荣誉榜.html`, buildEmailHtml(), "text/html;charset=utf-8");
+        updatePreview("HTML 已下载");
+      }
+      if (target.id === "downloadCsv") {
+        const rows = [["姓名", "族", "类型", "头像文件名"], ...state.people.map((person) => [person.name, person.tribe, person.category, person.avatarFile])];
+        download("晋升名单.csv", rows.map((row) => row.map(toCsvValue).join(",")).join("\n"), "text/csv;charset=utf-8");
+        updatePreview("CSV 已下载");
+      }
+      if (target.id === "copyHtml") {
+        try {
+          await navigator.clipboard.writeText(buildEmailHtml());
+          updatePreview("邮件 HTML 已复制");
+        } catch (error) {
+          updatePreview("复制失败，请改用下载 HTML");
+        }
+      }
+    });
+
+    document.addEventListener("change", (event) => {
+      const index = event.target.dataset.avatarPerson;
+      if (index === undefined) return;
+      const file = event.target.files[0];
+      if (!file) return;
+      const person = state.people[Number(index)];
+      const reader = new FileReader();
+      reader.onload = () => {
+        person.avatarFile = file.name;
+        state.avatars.set(file.name, String(reader.result || ""));
+        renderPeopleEditor();
+        updatePreview(`已为 ${person.name || "该人员"} 上传头像`);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    $("csvInput").addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => importCsv(String(reader.result || ""));
+      reader.readAsText(file, "utf-8");
+      event.target.value = "";
+    });
+
+    $("avatarInput").addEventListener("change", async (event) => {
+      const files = [...event.target.files];
+      const uploadedFiles = await Promise.all(files.map((file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const src = String(reader.result || "");
+          state.avatars.set(file.name, src);
+          resolve({ name: file.name, src });
+        };
+        reader.readAsDataURL(file);
+      })));
+      const matchedCount = matchUploadedAvatars(uploadedFiles);
+      renderPeopleEditor();
+      updatePreview(`已上传 ${files.length} 个头像，已匹配 ${matchedCount} 人`);
+      event.target.value = "";
+    });
+
+    ["year", "colsPerRow", "title", "subtitle", "greeting", "note", "slogan", "footerText", "footerNote"].forEach((id) => {
+      $(id).addEventListener("input", () => updatePreview());
+      $(id).addEventListener("change", () => updatePreview());
+    });
+
+    initResizableSidebar();
+    renderParagraphEditor();
+    renderPeopleEditor();
+    updatePreview();
+  </script>
+</body>
+</html>
