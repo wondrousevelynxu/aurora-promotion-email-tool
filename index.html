@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>职级晋级荣誉榜在线生成工具</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas/dist/html2canvas.min.js"></script>
   <style>
     :root {
       --brand: #18ad91;
@@ -321,7 +322,7 @@
 
     .person-meta {
       display: grid;
-      grid-template-columns: auto 1fr;
+      grid-template-columns: auto minmax(0, 1fr) auto;
       gap: 10px;
       align-items: center;
       margin-top: 10px;
@@ -336,16 +337,27 @@
     .avatar-preview {
       display: grid;
       place-items: center;
-      width: 52px;
-      height: 52px;
-      border: 2px solid var(--brand);
+      width: 100px;
+      height: 100px;
       border-radius: 50%;
       overflow: hidden;
       background: #e8f5f3;
       color: var(--brand);
-      font-size: 19px;
+      font-size: 36px;
       font-weight: 800;
-      box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    }
+
+    .avatar-preview[data-avatar-drag-person] {
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .avatar-preview.is-dragging {
+      cursor: grabbing;
+      box-shadow:
+        0 4px 12px rgba(15, 23, 42, 0.12),
+        0 0 0 4px rgba(24, 173, 145, 0.16);
     }
 
     .avatar-preview img {
@@ -353,6 +365,35 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    .avatar-controls {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .drag-tip {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .range-field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 0;
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      accent-color: var(--brand);
     }
 
     .avatar-upload {
@@ -484,6 +525,10 @@
         grid-template-columns: 1fr;
       }
 
+      .avatar-controls {
+        grid-template-columns: 1fr;
+      }
+
       .avatar-editor {
         grid-template-columns: auto 1fr;
         justify-items: start;
@@ -515,8 +560,8 @@
             <div>
               <label for="colsPerRow">每行人数</label>
               <select id="colsPerRow">
-                <option value="3">3 人</option>
-                <option value="4" selected>4 人</option>
+                <option value="3" selected>3 人</option>
+                <option value="4">4 人</option>
                 <option value="5">5 人</option>
               </select>
             </div>
@@ -570,7 +615,8 @@
           <div class="actions export-actions">
             <button type="button" id="copyHtml" class="primary">复制邮件 HTML</button>
             <button type="button" id="downloadHtml">下载 HTML</button>
-            <button type="button" id="downloadCsv" class="ghost">下载 CSV</button>
+            <button type="button" id="downloadPng">下载 PNG</button>
+            <button type="button" id="downloadJpg">下载 JPG</button>
           </div>
           <p id="status" class="status" aria-live="polite"></p>
         </div>
@@ -596,13 +642,9 @@
     };
 
     const samplePeople = [
-      { name: "张明", tribe: "T", category: "开发类", avatarFile: "zhangming.jpg" },
-      { name: "李薇", tribe: "T", category: "开发类", avatarFile: "liwei.jpg" },
+      { name: "张明", tribe: "T", category: "开发类", avatarFile: "" },
+      { name: "李薇", tribe: "T", category: "开发类", avatarFile: "" },
       { name: "王浩", tribe: "T", category: "开发类", avatarFile: "" },
-      { name: "陈晓", tribe: "T", category: "开发类", avatarFile: "" },
-      { name: "赵阳", tribe: "T", category: "开发类", avatarFile: "" },
-      { name: "孙悦", tribe: "T", category: "测试类", avatarFile: "" },
-      { name: "周磊", tribe: "T", category: "测试类", avatarFile: "" },
       { name: "林峰", tribe: "S", category: "销售类", avatarFile: "" },
       { name: "黄丽", tribe: "S", category: "销售类", avatarFile: "" },
       { name: "何强", tribe: "S", category: "销售类", avatarFile: "" },
@@ -694,13 +736,31 @@
       const year = $("year").value.trim() || "2026";
       const total = state.people.filter((person) => person.name.trim()).length;
       const weight = index === state.paragraphs.length - 1 ? "font-weight:600;" : "";
-      const totalHtml = `<span style="background:linear-gradient(135deg,#18AD91,#2477a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:800;">${total}</span>`;
+      const totalHtml = `<span style="color:#18AD91;font-weight:800;">${total}</span>`;
       const content = String(text ?? "")
         .replaceAll("{year}", year)
         .split("{total}")
         .map((part) => escapeHtml(part))
         .join(totalHtml);
       return weight ? `<span style="${weight}">${content}</span>` : content;
+    }
+
+    function avatarScale(person) {
+      return Number(person.avatarScale || 1);
+    }
+
+    function avatarX(person) {
+      return Number(person.avatarX || 50);
+    }
+
+    function avatarY(person) {
+      return Number(person.avatarY || 50);
+    }
+
+    function avatarImageStyle(person) {
+      const translateX = (avatarX(person) - 50) * 0.5;
+      const translateY = (avatarY(person) - 50) * 0.5;
+      return `width:100%;height:100%;object-fit:cover;object-position:${avatarX(person)}% ${avatarY(person)}%;transform:translate(${translateX}%, ${translateY}%) scale(${avatarScale(person)});transform-origin:center;display:block;pointer-events:none;will-change:transform;`;
     }
 
     function initialAvatar(name) {
@@ -711,7 +771,7 @@
     function avatarHtml(person) {
       const src = state.avatars.get(person.avatarFile);
       if (!src) return initialAvatar(person.name);
-      return `<div class="avatar-wrap" style="width:100px;height:100px;margin:0 auto 12px;border-radius:50%;overflow:hidden;background:#e8f5f3;box-shadow:0 4px 12px rgba(15,23,42,.12);"><img src="${src}" width="100" height="100" alt="${escapeHtml(person.name)}" style="width:100%;height:100%;object-fit:cover;display:block;"></div>`;
+      return `<div class="avatar-wrap" style="width:100px;height:100px;margin:0 auto 12px;border-radius:50%;overflow:hidden;background:#e8f5f3;box-shadow:0 4px 12px rgba(15,23,42,.12);"><img src="${src}" width="100" height="100" alt="${escapeHtml(person.name)}" style="${avatarImageStyle(person)}"></div>`;
     }
 
     function buildPersonTd(person, width) {
@@ -794,7 +854,7 @@ ${paragraphs}
 ${tribeHtml}
 
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:30px 0;">
-    <p style="text-align:center;font-size:15px;font-weight:700;margin:24px 0 6px;background:linear-gradient(135deg,#18AD91 0%,#2477a8 50%,#2c34b6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;">${slogan}</p>
+    <p style="text-align:center;font-size:15px;font-weight:700;margin:24px 0 6px;color:#18AD91;letter-spacing:1px;">${slogan}</p>
   </div>
 
   <div style="background:#f7fafc;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
@@ -823,9 +883,10 @@ ${tribeHtml}
     function editorAvatarPreview(person) {
       const src = state.avatars.get(person.avatarFile);
       if (src) {
-        return `<img src="${src}" alt="${escapeHtml(person.name || "头像")}">`;
+        return `<img src="${src}" alt="${escapeHtml(person.name || "头像")}" data-avatar-preview-image style="${avatarImageStyle(person)}">`;
       }
-      return escapeHtml((person.name || "?").trim().charAt(0) || "?");
+      const initial = escapeHtml((person.name || "?").trim().charAt(0) || "?");
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#e8f5f3"/><text x="50" y="52" text-anchor="middle" dominant-baseline="central" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="36" font-weight="700" fill="#18AD91">${initial}</text></svg>`;
     }
 
     function renderPeopleEditor() {
@@ -851,11 +912,18 @@ ${tribeHtml}
           </div>
           <div class="person-meta">
             <div class="avatar-editor">
-              <div class="avatar-preview">${editorAvatarPreview(person)}</div>
+              <div class="avatar-preview" data-avatar-drag-person="${index}" title="按住拖动头像调整位置">${editorAvatarPreview(person)}</div>
               <label class="avatar-upload ghost">
                 上传头像
                 <input type="file" accept="image/*" data-avatar-person="${index}">
               </label>
+            </div>
+            <div class="avatar-controls">
+              <div class="range-field">
+                <label for="avatarScale-${index}"><span>头像缩放</span><span id="avatarScaleValue-${index}">${Math.round(avatarScale(person) * 100)}%</span></label>
+                <input id="avatarScale-${index}" type="range" min="1" max="2.4" step="0.05" data-field="avatarScale" data-person-index="${index}" value="${avatarScale(person)}">
+              </div>
+              <p class="drag-tip">按住左侧头像，上下左右拖动调整位置</p>
             </div>
             <div class="actions compact-actions">
               <button type="button" class="ghost" data-remove-avatar="${index}">移除头像</button>
@@ -940,11 +1008,6 @@ ${tribeHtml}
       updatePreview(`已导入 ${state.people.length} 人`);
     }
 
-    function toCsvValue(value) {
-      const text = String(value ?? "");
-      return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
-    }
-
     function download(filename, content, type) {
       const blob = new Blob([content], { type });
       const url = URL.createObjectURL(blob);
@@ -953,6 +1016,150 @@ ${tribeHtml}
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+    }
+
+    async function waitForImages(element) {
+      const images = Array.from(element.querySelectorAll("img"));
+      await Promise.all(images.map((image) => {
+        if (image.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          image.onload = resolve;
+          image.onerror = resolve;
+        });
+      }));
+    }
+
+    async function createExportCanvas() {
+      if (!window.html2canvas) {
+        throw new Error("图片导出组件未加载");
+      }
+
+      const exportWidth = 800;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(buildEmailHtml(), "text/html");
+      const exportRoot = document.createElement("div");
+      exportRoot.setAttribute(
+        "style",
+        [
+          "position:absolute",
+          "left:0",
+          "top:0",
+          "width:800px",
+          "min-height:1px",
+          "background:#f0f2f5",
+          "font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif",
+          "z-index:999999",
+          "pointer-events:none"
+        ].join(";")
+      );
+      exportRoot.innerHTML = doc.body.innerHTML;
+      document.body.appendChild(exportRoot);
+
+      try {
+        await waitForImages(exportRoot);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const height = Math.ceil(exportRoot.scrollHeight);
+        exportRoot.style.height = `${height}px`;
+        return await window.html2canvas(exportRoot, {
+          backgroundColor: "#f0f2f5",
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: exportWidth,
+          height,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: exportWidth,
+          windowHeight: height
+        });
+      } finally {
+        exportRoot.remove();
+      }
+    }
+
+    async function downloadPreviewImage(format = "png") {
+      const year = $("year").value.trim() || "2026";
+      try {
+        const canvas = await createExportCanvas();
+        const isJpg = format === "jpg";
+        const mimeType = isJpg ? "image/jpeg" : "image/png";
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, mimeType, 0.95));
+        if (!blob) throw new Error("PNG blob is empty");
+        const imageUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = imageUrl;
+        link.download = `${year}年度职级晋级荣誉榜.${isJpg ? "jpg" : "png"}`;
+        link.click();
+        URL.revokeObjectURL(imageUrl);
+        updatePreview(`${isJpg ? "JPG" : "PNG"} 已下载`);
+      } catch (error) {
+        updatePreview("图片导出失败，请确认网络正常后刷新页面再试");
+      }
+    }
+
+    function updateAvatarPreview(index) {
+      const person = state.people[index];
+      const personCard = document.querySelector(`[data-avatar-drag-person="${index}"]`)?.closest(".person-card");
+      const image = personCard?.querySelector("[data-avatar-preview-image]");
+      const scaleValue = $(`avatarScaleValue-${index}`);
+      if (scaleValue) scaleValue.textContent = `${Math.round(avatarScale(person) * 100)}%`;
+      if (image) image.setAttribute("style", avatarImageStyle(person));
+    }
+
+    let avatarDrag = null;
+    let previewUpdateTimer = 0;
+
+    function schedulePreviewUpdate() {
+      window.clearTimeout(previewUpdateTimer);
+      previewUpdateTimer = window.setTimeout(() => updatePreview(), 120);
+    }
+
+    function startAvatarDrag(event) {
+      const preview = event.target.closest("[data-avatar-drag-person]");
+      if (!preview) return;
+      const index = Number(preview.dataset.avatarDragPerson);
+      const person = state.people[index];
+      if (!person || !state.avatars.has(person.avatarFile)) return;
+      event.preventDefault();
+      preview.setPointerCapture(event.pointerId);
+      preview.classList.add("is-dragging");
+      avatarDrag = {
+        index,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: avatarX(person),
+        originY: avatarY(person),
+        size: preview.getBoundingClientRect().width || 100,
+        preview,
+        frame: 0
+      };
+    }
+
+    function moveAvatarDrag(event) {
+      if (!avatarDrag || event.pointerId !== avatarDrag.pointerId) return;
+      const person = state.people[avatarDrag.index];
+      const sensitivity = 100 / avatarDrag.size;
+      person.avatarX = clamp(avatarDrag.originX + ((event.clientX - avatarDrag.startX) * sensitivity), 0, 100);
+      person.avatarY = clamp(avatarDrag.originY + ((event.clientY - avatarDrag.startY) * sensitivity), 0, 100);
+      if (!avatarDrag.frame) {
+        avatarDrag.frame = requestAnimationFrame(() => {
+          updateAvatarPreview(avatarDrag.index);
+          avatarDrag.frame = 0;
+        });
+      }
+    }
+
+    function stopAvatarDrag(event) {
+      if (!avatarDrag || event.pointerId !== avatarDrag.pointerId) return;
+      if (avatarDrag.frame) {
+        cancelAnimationFrame(avatarDrag.frame);
+        updateAvatarPreview(avatarDrag.index);
+      }
+      avatarDrag.preview.classList.remove("is-dragging");
+      avatarDrag.preview.releasePointerCapture(event.pointerId);
+      avatarDrag = null;
+      updatePreview();
     }
 
     function normalizeName(value) {
@@ -985,6 +1192,9 @@ ${tribeHtml}
         });
         if (!matched) return;
         person.avatarFile = matched.name;
+        person.avatarScale = person.avatarScale || 1;
+        person.avatarX = person.avatarX || 50;
+        person.avatarY = person.avatarY || 50;
         usedFiles.add(matched.name);
         matchedPeople.add(personIndex);
       });
@@ -997,6 +1207,9 @@ ${tribeHtml}
         });
         if (emptyPersonIndex < 0) return;
         state.people[emptyPersonIndex].avatarFile = file.name;
+        state.people[emptyPersonIndex].avatarScale = state.people[emptyPersonIndex].avatarScale || 1;
+        state.people[emptyPersonIndex].avatarX = state.people[emptyPersonIndex].avatarX || 50;
+        state.people[emptyPersonIndex].avatarY = state.people[emptyPersonIndex].avatarY || 50;
         usedFiles.add(file.name);
         matchedPeople.add(emptyPersonIndex);
       });
@@ -1008,14 +1221,26 @@ ${tribeHtml}
       const paragraphIndex = event.target.dataset.paragraphIndex;
       const personIndex = event.target.dataset.personIndex;
       const field = event.target.dataset.field;
+      let shouldUpdatePreview = true;
       if (paragraphIndex !== undefined) {
         state.paragraphs[Number(paragraphIndex)] = event.target.value;
       }
       if (personIndex !== undefined && field) {
-        state.people[Number(personIndex)][field] = event.target.value;
+        const index = Number(personIndex);
+        state.people[index][field] = event.target.value;
+        if (field === "avatarScale") {
+          updateAvatarPreview(index);
+          schedulePreviewUpdate();
+          shouldUpdatePreview = false;
+        }
       }
-      updatePreview();
+      if (shouldUpdatePreview) updatePreview();
     });
+
+    document.addEventListener("pointerdown", startAvatarDrag);
+    document.addEventListener("pointermove", moveAvatarDrag);
+    document.addEventListener("pointerup", stopAvatarDrag);
+    document.addEventListener("pointercancel", stopAvatarDrag);
 
     document.addEventListener("click", async (event) => {
       const target = event.target;
@@ -1046,7 +1271,7 @@ ${tribeHtml}
         }
       }
       if (target.id === "addPerson") {
-        state.people.push({ name: "", tribe: "T", category: "", avatarFile: "" });
+        state.people.push({ name: "", tribe: "T", category: "", avatarFile: "", avatarScale: 1, avatarX: 50, avatarY: 50 });
         renderPeopleEditor();
         updatePreview("已添加人员");
       }
@@ -1061,6 +1286,9 @@ ${tribeHtml}
         if (avatarFile) {
           state.avatars.delete(avatarFile);
           state.people[index].avatarFile = "";
+          state.people[index].avatarScale = 1;
+          state.people[index].avatarX = 50;
+          state.people[index].avatarY = 50;
         }
         renderPeopleEditor();
         updatePreview("已移除头像");
@@ -1080,10 +1308,13 @@ ${tribeHtml}
         download(`${year}年度职级晋级荣誉榜.html`, buildEmailHtml(), "text/html;charset=utf-8");
         updatePreview("HTML 已下载");
       }
-      if (target.id === "downloadCsv") {
-        const rows = [["姓名", "族", "类型", "头像文件名"], ...state.people.map((person) => [person.name, person.tribe, person.category, person.avatarFile])];
-        download("晋升名单.csv", rows.map((row) => row.map(toCsvValue).join(",")).join("\n"), "text/csv;charset=utf-8");
-        updatePreview("CSV 已下载");
+      if (target.id === "downloadPng") {
+        updatePreview("正在生成 PNG...");
+        await downloadPreviewImage("png");
+      }
+      if (target.id === "downloadJpg") {
+        updatePreview("正在生成 JPG...");
+        await downloadPreviewImage("jpg");
       }
       if (target.id === "copyHtml") {
         try {
@@ -1104,6 +1335,9 @@ ${tribeHtml}
       const reader = new FileReader();
       reader.onload = () => {
         person.avatarFile = file.name;
+        person.avatarScale = person.avatarScale || 1;
+        person.avatarX = person.avatarX || 50;
+        person.avatarY = person.avatarY || 50;
         state.avatars.set(file.name, String(reader.result || ""));
         renderPeopleEditor();
         updatePreview(`已为 ${person.name || "该人员"} 上传头像`);
