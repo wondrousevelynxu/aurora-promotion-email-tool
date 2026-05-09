@@ -524,12 +524,6 @@
 
           <label for="title">中文标题</label>
           <input id="title" value="{year}年度职级晋级荣誉榜">
-
-          <label for="subtitle">英文副标题</label>
-          <input id="subtitle" value="{year} Professional Level Promotion Honor Roll">
-
-          <label for="greeting">开头称呼</label>
-          <input id="greeting" value="Dear All，">
         </div>
 
         <div class="section">
@@ -547,10 +541,7 @@
           <input id="slogan" value="让极光理想照亮每一个人，让每一个人闪耀极光！">
 
           <label for="footerText">页脚署名</label>
-          <input id="footerText" value="{year} · 人力资源部 Aurora HR Department">
-
-          <label for="footerNote">页脚说明</label>
-          <input id="footerNote" value="本邮件由系统自动发送，请勿直接回复">
+          <input id="footerText" value="极光人力资源部">
         </div>
 
         <div class="section">
@@ -599,9 +590,9 @@
 
   <script>
     const tribeConfig = {
-      T: { label: "T 族", sub: "Technical · 技术序列" },
-      S: { label: "S 族", sub: "Sales · 销售序列" },
-      P: { label: "P 族", sub: "Professional · 职能序列" }
+      T: { label: "T 族" },
+      S: { label: "S 族" },
+      P: { label: "P 族" }
     };
 
     const samplePeople = [
@@ -714,13 +705,13 @@
 
     function initialAvatar(name) {
       const initial = escapeHtml((name || "?").trim().charAt(0) || "?");
-      return `<div class="avatar-wrap" style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;border:2.5px solid #18AD91;overflow:hidden;background:#e8f5f3;"><svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56"><rect width="56" height="56" rx="28" fill="#e8f5f3"/><text x="28" y="30" text-anchor="middle" dominant-baseline="central" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" fill="#18AD91">${initial}</text></svg></div>`;
+      return `<div class="avatar-wrap" style="width:100px;height:100px;margin:0 auto 12px;border-radius:50%;overflow:hidden;background:#e8f5f3;box-shadow:0 4px 12px rgba(15,23,42,.12);"><svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#e8f5f3"/><text x="50" y="52" text-anchor="middle" dominant-baseline="central" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="36" font-weight="700" fill="#18AD91">${initial}</text></svg></div>`;
     }
 
     function avatarHtml(person) {
       const src = state.avatars.get(person.avatarFile);
       if (!src) return initialAvatar(person.name);
-      return `<div class="avatar-wrap" style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;border:2.5px solid #18AD91;overflow:hidden;background:#e8f5f3;"><img src="${src}" width="56" height="56" alt="${escapeHtml(person.name)}" style="width:100%;height:100%;object-fit:cover;display:block;"></div>`;
+      return `<div class="avatar-wrap" style="width:100px;height:100px;margin:0 auto 12px;border-radius:50%;overflow:hidden;background:#e8f5f3;box-shadow:0 4px 12px rgba(15,23,42,.12);"><img src="${src}" width="100" height="100" alt="${escapeHtml(person.name)}" style="width:100%;height:100%;object-fit:cover;display:block;"></div>`;
     }
 
     function buildPersonTd(person, width) {
@@ -735,7 +726,7 @@
     function buildTribeSection(tribeKey, people) {
       const cols = Number($("colsPerRow").value || 4);
       const width = Math.floor(100 / cols);
-      const config = tribeConfig[tribeKey] || { label: `${tribeKey} 族`, sub: "" };
+      const config = tribeConfig[tribeKey] || { label: `${tribeKey} 族` };
       const rows = [];
       for (let index = 0; index < people.length; index += cols) {
         const chunk = people.slice(index, index + cols);
@@ -751,7 +742,6 @@
     <div style="text-align:center;margin:0 0 6px;">
       <span style="display:inline-block;background:linear-gradient(135deg,#18AD91 0%,#199c99 33%,#2477a8 66%,#2c34b6 100%);color:#fff;font-size:18px;font-weight:800;padding:4px 28px;border-radius:999px;letter-spacing:2px;">${escapeHtml(config.label)}</span>
     </div>
-    <p style="text-align:center;font-size:13px;color:#94a3b8;margin:0 0 20px;letter-spacing:.5px;">${escapeHtml(config.sub)}</p>
     <table width="100%" cellspacing="8" cellpadding="0" role="presentation" style="border-collapse:separate;border-spacing:8px;margin:0 0 6px;">
 ${rows.join("\n")}
     </table>`;
@@ -777,8 +767,6 @@ ${rows.join("\n")}
         .map((key) => buildTribeSection(key, grouped.get(key)))
         .join("\n");
       const title = escapeHtml(fillTemplate($("title").value));
-      const subtitle = escapeHtml(fillTemplate($("subtitle").value));
-      const greeting = escapeHtml(fillTemplate($("greeting").value));
       const paragraphs = state.paragraphs
         .filter((text) => text.trim())
         .map((text, index) => `    <p style="margin:0 0 10px;font-size:14px;color:#4a5568;line-height:1.85;">${paragraphHtml(text, index)}</p>`)
@@ -786,7 +774,6 @@ ${rows.join("\n")}
       const note = escapeHtml(fillTemplate($("note").value));
       const slogan = escapeHtml(fillTemplate($("slogan").value));
       const footerText = escapeHtml(fillTemplate($("footerText").value));
-      const footerNote = escapeHtml(fillTemplate($("footerNote").value));
 
       return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -799,11 +786,9 @@ ${rows.join("\n")}
 
   <div style="background:linear-gradient(135deg,#18AD91 0%,#199c99 33%,#2477a8 66%,#2c34b6 100%);padding:44px 40px 40px;color:#fff;text-align:center;position:relative;overflow:hidden;">
     <h1 style="font-size:26px;font-weight:700;letter-spacing:3px;margin:0;line-height:1.4;">${title}</h1>
-    <div style="font-size:14px;opacity:.75;margin-top:8px;letter-spacing:.5px;">${subtitle}</div>
   </div>
 
   <div style="padding:36px 40px 20px;font-size:14px;line-height:1.8;color:#4a5568;">
-    <p style="margin:0 0 10px;font-size:14px;color:#4a5568;line-height:1.85;">${greeting}</p>
 ${paragraphs}
     <p style="font-size:12px;color:#64748b;margin:16px 0 0;">${note}</p>
 ${tribeHtml}
@@ -814,7 +799,6 @@ ${tribeHtml}
 
   <div style="background:#f7fafc;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
     <p style="font-size:12px;color:#a0aec0;margin:0;line-height:1.6;">${footerText}</p>
-    <p style="font-size:12px;color:#a0aec0;margin:0;line-height:1.6;">${footerNote}</p>
   </div>
 
 </div></div>
@@ -1153,7 +1137,7 @@ ${tribeHtml}
       event.target.value = "";
     });
 
-    ["year", "colsPerRow", "title", "subtitle", "greeting", "note", "slogan", "footerText", "footerNote"].forEach((id) => {
+    ["year", "colsPerRow", "title", "note", "slogan", "footerText"].forEach((id) => {
       $(id).addEventListener("input", () => updatePreview());
       $(id).addEventListener("change", () => updatePreview());
     });
