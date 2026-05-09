@@ -214,6 +214,12 @@
       gap: 12px;
     }
 
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -339,6 +345,7 @@
       place-items: center;
       width: 100px;
       height: 100px;
+      position: relative;
       border-radius: 50%;
       overflow: hidden;
       background: #e8f5f3;
@@ -361,10 +368,10 @@
     }
 
     .avatar-preview img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
       display: block;
+      position: absolute;
+      left: 50%;
+      top: 50%;
       pointer-events: none;
       will-change: transform;
     }
@@ -519,6 +526,7 @@
       }
 
       .grid-2,
+      .grid-3,
       .people-toolbar,
       .person-row,
       .person-meta {
@@ -569,6 +577,22 @@
 
           <label for="title">中文标题</label>
           <input id="title" value="{year}年度职级晋级荣誉榜">
+
+          <label>分组标题</label>
+          <div class="grid-3">
+            <div>
+              <label for="tribeLabelT">T 族标题</label>
+              <input id="tribeLabelT" value="T 族">
+            </div>
+            <div>
+              <label for="tribeLabelS">S 族标题</label>
+              <input id="tribeLabelS" value="S 族">
+            </div>
+            <div>
+              <label for="tribeLabelP">P 族标题</label>
+              <input id="tribeLabelP" value="P 族">
+            </div>
+          </div>
         </div>
 
         <div class="section">
@@ -636,9 +660,9 @@
 
   <script>
     const tribeConfig = {
-      T: { label: "T 族" },
-      S: { label: "S 族" },
-      P: { label: "P 族" }
+      T: { label: "T 族", inputId: "tribeLabelT" },
+      S: { label: "S 族", inputId: "tribeLabelS" },
+      P: { label: "P 族", inputId: "tribeLabelP" }
     };
 
     const samplePeople = [
@@ -664,7 +688,8 @@
     const state = {
       paragraphs: [...defaultParagraphs],
       people: samplePeople.map((person) => ({ ...person })),
-      avatars: new Map()
+      avatars: new Map(),
+      avatarSizes: new Map()
     };
 
     const $ = (id) => document.getElementById(id);
@@ -758,9 +783,13 @@
     }
 
     function avatarImageStyle(person) {
-      const translateX = (avatarX(person) - 50) * 0.5;
-      const translateY = (avatarY(person) - 50) * 0.5;
-      return `width:100%;height:100%;object-fit:cover;object-position:${avatarX(person)}% ${avatarY(person)}%;transform:translate(${translateX}%, ${translateY}%) scale(${avatarScale(person)});transform-origin:center;display:block;pointer-events:none;will-change:transform;`;
+      const size = state.avatarSizes.get(person.avatarFile) || { width: 1, height: 1 };
+      const ratio = size.width / size.height;
+      const baseWidth = ratio >= 1 ? 100 * ratio : 100;
+      const baseHeight = ratio >= 1 ? 100 : 100 / ratio;
+      const offsetX = avatarX(person) - 50;
+      const offsetY = avatarY(person) - 50;
+      return `width:${baseWidth}px;height:${baseHeight}px;transform:translate(-50%,-50%) translate(${offsetX}px,${offsetY}px) scale(${avatarScale(person)});transform-origin:center;display:block;position:absolute;left:50%;top:50%;pointer-events:none;will-change:transform;`;
     }
 
     function initialAvatar(name) {
@@ -771,7 +800,13 @@
     function avatarHtml(person) {
       const src = state.avatars.get(person.avatarFile);
       if (!src) return initialAvatar(person.name);
-      return `<div class="avatar-wrap" style="width:100px;height:100px;margin:0 auto 12px;border-radius:50%;overflow:hidden;background:#e8f5f3;box-shadow:0 4px 12px rgba(15,23,42,.12);"><img src="${src}" width="100" height="100" alt="${escapeHtml(person.name)}" style="${avatarImageStyle(person)}"></div>`;
+      return `<div class="avatar-wrap" style="width:100px;height:100px;margin:0 auto 12px;border-radius:50%;overflow:hidden;background:#e8f5f3;box-shadow:0 4px 12px rgba(15,23,42,.12);position:relative;"><img src="${src}" alt="${escapeHtml(person.name)}" style="${avatarImageStyle(person)}"></div>`;
+    }
+
+    function tribeLabel(tribeKey) {
+      const config = tribeConfig[tribeKey];
+      const input = config?.inputId ? $(config.inputId) : null;
+      return input?.value.trim() || config?.label || `${tribeKey} 族`;
     }
 
     function buildPersonTd(person, width) {
@@ -786,7 +821,7 @@
     function buildTribeSection(tribeKey, people) {
       const cols = Number($("colsPerRow").value || 4);
       const width = Math.floor(100 / cols);
-      const config = tribeConfig[tribeKey] || { label: `${tribeKey} 族` };
+      const label = tribeLabel(tribeKey);
       const rows = [];
       for (let index = 0; index < people.length; index += cols) {
         const chunk = people.slice(index, index + cols);
@@ -800,7 +835,7 @@
       return `
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:30px 0;">
     <div style="text-align:center;margin:0 0 6px;">
-      <span style="display:inline-block;background:linear-gradient(135deg,#18AD91 0%,#199c99 33%,#2477a8 66%,#2c34b6 100%);color:#fff;font-size:18px;font-weight:800;padding:4px 28px;border-radius:999px;letter-spacing:2px;">${escapeHtml(config.label)}</span>
+      <span style="display:inline-block;width:auto;max-width:100%;box-sizing:border-box;white-space:nowrap;background:linear-gradient(135deg,#18AD91 0%,#199c99 33%,#2477a8 66%,#2c34b6 100%);color:#fff;font-size:18px;font-weight:800;padding:4px 20px;border-radius:999px;letter-spacing:2px;">${escapeHtml(label)}</span>
     </div>
     <table width="100%" cellspacing="8" cellpadding="0" role="presentation" style="border-collapse:separate;border-spacing:8px;margin:0 0 6px;">
 ${rows.join("\n")}
@@ -1029,37 +1064,61 @@ ${tribeHtml}
       }));
     }
 
+    function readImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const src = String(reader.result || "");
+          const image = new Image();
+          image.onload = () => resolve({
+            name: file.name,
+            src,
+            width: image.naturalWidth || image.width || 1,
+            height: image.naturalHeight || image.height || 1
+          });
+          image.onerror = () => resolve({ name: file.name, src, width: 1, height: 1 });
+          image.src = src;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function waitForFrameReady(frame) {
+      return new Promise((resolve) => {
+        frame.onload = () => requestAnimationFrame(() => requestAnimationFrame(resolve));
+      });
+    }
+
     async function createExportCanvas() {
       if (!window.html2canvas) {
         throw new Error("图片导出组件未加载");
       }
 
       const exportWidth = 800;
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(buildEmailHtml(), "text/html");
-      const exportRoot = document.createElement("div");
-      exportRoot.setAttribute(
-        "style",
-        [
-          "position:absolute",
-          "left:0",
-          "top:0",
-          "width:800px",
-          "min-height:1px",
-          "background:#f0f2f5",
-          "font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif",
-          "z-index:999999",
-          "pointer-events:none"
-        ].join(";")
-      );
-      exportRoot.innerHTML = doc.body.innerHTML;
-      document.body.appendChild(exportRoot);
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.left = "0";
+      frame.style.top = "0";
+      frame.style.width = `${exportWidth}px`;
+      frame.style.height = "1px";
+      frame.style.border = "0";
+      frame.style.opacity = "0";
+      frame.style.pointerEvents = "none";
+      frame.style.zIndex = "-1";
+      document.body.appendChild(frame);
 
       try {
+        const ready = waitForFrameReady(frame);
+        frame.srcdoc = buildEmailHtml();
+        await ready;
+
+        const doc = frame.contentDocument;
+        const exportRoot = doc.body;
         await waitForImages(exportRoot);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        const height = Math.ceil(exportRoot.scrollHeight);
-        exportRoot.style.height = `${height}px`;
+        const height = Math.ceil(Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight));
+        frame.style.height = `${height}px`;
         return await window.html2canvas(exportRoot, {
           backgroundColor: "#f0f2f5",
           scale: 2,
@@ -1073,7 +1132,7 @@ ${tribeHtml}
           windowHeight: height
         });
       } finally {
-        exportRoot.remove();
+        frame.remove();
       }
     }
 
@@ -1332,17 +1391,16 @@ ${tribeHtml}
       const file = event.target.files[0];
       if (!file) return;
       const person = state.people[Number(index)];
-      const reader = new FileReader();
-      reader.onload = () => {
-        person.avatarFile = file.name;
+      readImageFile(file).then((imageData) => {
+        person.avatarFile = imageData.name;
         person.avatarScale = person.avatarScale || 1;
         person.avatarX = person.avatarX || 50;
         person.avatarY = person.avatarY || 50;
-        state.avatars.set(file.name, String(reader.result || ""));
+        state.avatars.set(imageData.name, imageData.src);
+        state.avatarSizes.set(imageData.name, { width: imageData.width, height: imageData.height });
         renderPeopleEditor();
         updatePreview(`已为 ${person.name || "该人员"} 上传头像`);
-      };
-      reader.readAsDataURL(file);
+      });
     });
 
     $("csvInput").addEventListener("change", (event) => {
@@ -1356,22 +1414,18 @@ ${tribeHtml}
 
     $("avatarInput").addEventListener("change", async (event) => {
       const files = [...event.target.files];
-      const uploadedFiles = await Promise.all(files.map((file) => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const src = String(reader.result || "");
-          state.avatars.set(file.name, src);
-          resolve({ name: file.name, src });
-        };
-        reader.readAsDataURL(file);
-      })));
+      const uploadedFiles = await Promise.all(files.map(readImageFile));
+      uploadedFiles.forEach((imageData) => {
+        state.avatars.set(imageData.name, imageData.src);
+        state.avatarSizes.set(imageData.name, { width: imageData.width, height: imageData.height });
+      });
       const matchedCount = matchUploadedAvatars(uploadedFiles);
       renderPeopleEditor();
       updatePreview(`已上传 ${files.length} 个头像，已匹配 ${matchedCount} 人`);
       event.target.value = "";
     });
 
-    ["year", "colsPerRow", "title", "note", "slogan", "footerText"].forEach((id) => {
+    ["year", "colsPerRow", "title", "tribeLabelT", "tribeLabelS", "tribeLabelP", "note", "slogan", "footerText"].forEach((id) => {
       $(id).addEventListener("input", () => updatePreview());
       $(id).addEventListener("change", () => updatePreview());
     });
